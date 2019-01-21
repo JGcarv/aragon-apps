@@ -1,5 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
+import { Spring, animated } from 'react-spring'
 import { compareDesc } from 'date-fns'
 import {
   Button,
@@ -8,11 +9,15 @@ import {
   TableRow,
   DropDown,
   theme,
+  breakpoint,
+  BreakPoint,
+  springs,
 } from '@aragon/ui'
 import * as TransferTypes from '../transfer-types'
 import { addressesEqual, toChecksumAddress } from '../lib/web3-utils'
 import TransferRow from './TransferRow'
 import GetWindowSize from './GetWindowSize'
+import ToggleFiltersButton from './ToggleFiltersButton'
 
 const TRANSFER_TYPES = [
   TransferTypes.All,
@@ -31,8 +36,12 @@ const initialState = {
 class Transfers extends React.Component {
   state = {
     ...initialState,
+    filtersOpened: !this.props.autohide,
   }
 
+  handleToggleFiltersClick = () => {
+    this.setState(({ filtersOpened }) => ({ filtersOpened: !filtersOpened }))
+  }
   handleTokenChange = index => {
     this.setState({
       selectedToken: index,
@@ -76,10 +85,11 @@ class Transfers extends React.Component {
   render() {
     const {
       displayedTransfers,
+      filtersOpened,
       selectedToken,
       selectedTransferType,
     } = this.state
-    const { transactions, tokens } = this.props
+    const { transactions, tokens, autohide } = this.props
     const filteredTransfers = this.getFilteredTransfers({
       tokens,
       transactions,
@@ -101,27 +111,55 @@ class Transfers extends React.Component {
     return (
       <section>
         <Header>
-          <Title>Transfers</Title>
-          {filteredTransfers.length > 0 && (
-            <Filters>
-              <FilterLabel>
-                <Label>Token:</Label>
-                <DropDown
-                  items={['All', ...symbols]}
-                  active={selectedToken}
-                  onChange={this.handleTokenChange}
-                />
-              </FilterLabel>
-              <FilterLabel>
-                <Label>Transfer type:</Label>
-                <DropDown
-                  items={TRANSFER_TYPES_STRING}
-                  active={selectedTransferType}
-                  onChange={this.handleTransferTypeChange}
-                />
-              </FilterLabel>
-            </Filters>
-          )}
+          <Title>
+            Transfers{' '}
+            <BreakPoint to="medium">
+              <ToggleFiltersButton
+                title="Toggle Filters"
+                onClick={this.handleToggleFiltersClick}
+              />
+            </BreakPoint>
+          </Title>
+          <Spring
+            native
+            config={springs.clamp}
+            from={{ progress: 0 }}
+            to={{ progress: filtersOpened ? 1 : 0 }}
+            immediate={!autohide}
+          >
+            {({ progress }) =>
+              filteredTransfers.length > 0 && (
+                <Filters
+                  style={{
+                    overflow: progress.interpolate(
+                      v => (v === 1 ? 'unset' : 'hidden')
+                    ),
+                    height: progress.interpolate(
+                      v => (v === 1 ? 'auto' : `${62 * v}px`)
+                    ),
+                    opacity: progress.interpolate(v => (v ? 1 : 0)),
+                  }}
+                >
+                  <FilterLabel>
+                    <Label>Token:</Label>
+                    <DropDown
+                      items={['All', ...symbols]}
+                      active={selectedToken}
+                      onChange={this.handleTokenChange}
+                    />
+                  </FilterLabel>
+                  <FilterLabel>
+                    <Label>Transfer type:</Label>
+                    <DropDown
+                      items={TRANSFER_TYPES_STRING}
+                      active={selectedTransferType}
+                      onChange={this.handleTransferTypeChange}
+                    />
+                  </FilterLabel>
+                </Filters>
+              )
+            }
+          </Spring>
         </Header>
         {filteredTransfers.length === 0 ? (
           <NoTransfers>
@@ -140,13 +178,15 @@ class Transfers extends React.Component {
               {({ width }) => (
                 <FixedTable
                   header={
-                    <TableRow>
-                      <DateHeader title="Date" />
-                      <SourceRecipientHeader title="Source / Recipient" />
-                      <ReferenceHeader title="Reference" />
-                      <AmountHeader title="Amount" align="right" />
-                      <TableHeader />
-                    </TableRow>
+                    <BreakPoint from="medium">
+                      <TableRow>
+                        <DateHeader title="Date" />
+                        <SourceRecipientHeader title="Source / Recipient" />
+                        <ReferenceHeader title="Reference" />
+                        <AmountHeader title="Amount" align="right" />
+                        <TableHeader />
+                      </TableRow>
+                    </BreakPoint>
                   }
                 >
                   {filteredTransfers
@@ -181,37 +221,74 @@ class Transfers extends React.Component {
 }
 
 const Header = styled.div`
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: nowrap;
   margin-bottom: 10px;
+
+  ${breakpoint(
+    'medium',
+    `
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: nowrap;
+  `
+  )};
 `
 
-const Filters = styled.div`
-  display: flex;
-  flex-wrap: nowrap;
+const Filters = styled(animated.div)`
+  display: grid;
+  grid-template-columns: 50% 50%;
+  margin: 0 20px 20px 20px;
+
+  ${breakpoint(
+    'medium',
+    `
+      display: flex;
+      flex-wrap: nowrap;
+      margin: 0;
+    `
+  )};
 `
 
 const FilterLabel = styled.label`
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  white-space: nowrap;
+  ${breakpoint(
+    'medium',
+    `
+      display: flex;
+      flex-wrap: nowrap;
+      align-items: center;
+      white-space: nowrap;
+    `
+  )};
 `
 
 const Title = styled.h1`
-  margin-top: 10px;
-  margin-bottom: 20px;
+  margin: 20px 20px 10px 20px;
   font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+
+  ${breakpoint(
+    'medium',
+    `
+      margin: 10px 30px 20px 0;
+    `
+  )};
 `
 
 const Label = styled.span`
+  display: block;
   margin-right: 15px;
-  margin-left: 20px;
   font-variant: small-caps;
   text-transform: lowercase;
   color: ${theme.textSecondary};
   font-weight: 600;
+
+  ${breakpoint(
+    'medium',
+    `
+      display: inline;
+      margin-left: 20px;
+    `
+  )};
 `
 
 const NoTransfers = styled.div`
@@ -231,6 +308,14 @@ const NoTransfers = styled.div`
 
 const FixedTable = styled(Table)`
   color: rgba(0, 0, 0, 0.75);
+  margin-bottom: 20px;
+
+  ${breakpoint(
+    'medium',
+    `
+    margin-bottom: 0;
+  `
+  )};
 `
 
 const DateHeader = styled(TableHeader)`
@@ -252,4 +337,13 @@ const Footer = styled.div`
   margin-top: 30px;
 `
 
-export default Transfers
+export default props => (
+  <React.Fragment>
+    <BreakPoint to="medium">
+      <Transfers {...props} autohide />
+    </BreakPoint>
+    <BreakPoint from="medium">
+      <Transfers {...props} />
+    </BreakPoint>
+  </React.Fragment>
+)
